@@ -21,7 +21,13 @@ DATA_DIR = 'images/'
 # Nombre del archivo para guardar el modelo entrenado
 MODEL_FILENAME = 'emotion_model.keras'
 # Nombre del archivo para guardar las etiquetas de las clases
-CLASSES_FILENAME = 'class_names.json'
+# CLASSES_FILENAME = 'class_names.json'
+# Nombre del archivo para guardar los nombres de las personas
+# PERSONS_FILENAME = 'person_names.json'
+
+# Variables globales para las clases y nombres de personas
+CLASS_NAMES = []
+PERSON_NAMES = []
 
 def setup_hardware():
     """Detecta y configura el hardware (GPU o CPU) para el entrenamiento."""
@@ -60,6 +66,7 @@ def load_data_with_opencv():
 
     images = []
     labels = []
+    person_names = []
     
     # Obtener clases y omitir carpetas vacías
     class_names = [d for d in sorted(os.listdir(DATA_DIR)) if os.path.isdir(os.path.join(DATA_DIR, d))]
@@ -76,6 +83,9 @@ def load_data_with_opencv():
         
     class_map = {name: i for i, name in enumerate(valid_class_names)}
     print(f"\nClases detectadas para el entrenamiento: {valid_class_names}")
+    # Guardar en variable global
+    global CLASS_NAMES
+    CLASS_NAMES = valid_class_names
 
     # Iterar sobre cada carpeta de emoción
     for class_name, label_idx in class_map.items():
@@ -104,15 +114,26 @@ def load_data_with_opencv():
                 face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
                 images.append(face_img)
                 labels.append(label_idx)
+                # --- Nuevo: extraer nombre de persona ---
+                if img_name.startswith("Magleo_"):
+                    person_names.append("Magleo")
+                elif img_name.startswith("Hector_"):
+                    person_names.append("Hector")
+                else:
+                    person_names.append("desconocido")
 
     # Convertir listas a arrays de NumPy
     X = np.array(images)
     y = np.array(labels)
+    person_names = np.array(person_names)
     
     # Dividir los datos en conjuntos de entrenamiento y validación
-    X_train, X_val, y_train, y_val = train_test_split(
-        X, y, test_size=0.2, random_state=42, stratify=y
+    X_train, X_val, y_train, y_val, person_train, person_val = train_test_split(
+        X, y, person_names, test_size=0.3, random_state=42, stratify=y
     )
+    # Guardar nombres de personas de validación en variable global
+    global PERSON_NAMES
+    PERSON_NAMES = list(person_val)
 
     print(f"📊 Total de imágenes cargadas: {len(X)}")
     print(f"   - Entrenamiento: {len(X_train)} imágenes")
@@ -127,13 +148,9 @@ def load_data_with_opencv():
     train_ds = train_ds.shuffle(buffer_size=len(X_train)).batch(BATCH_SIZE).cache().prefetch(buffer_size=AUTOTUNE)
     val_ds = val_ds.batch(BATCH_SIZE).cache().prefetch(buffer_size=AUTOTUNE)
     
-    # Guardar las clases para usarlas en el script de prueba
-    with open(CLASSES_FILENAME, 'w') as f:
-        json.dump(valid_class_names, f)
-    print(f"💾 Clases guardadas en '{CLASSES_FILENAME}'")
-    
-    return train_ds, val_ds, valid_class_names
-
+    # Eliminar guardado de archivos JSON
+    # return train_ds, val_ds, valid_class_names
+    return train_ds, val_ds
 
 def build_model(num_classes):
     """Construye y compila el modelo CNN."""
@@ -159,12 +176,12 @@ def main():
     device = setup_hardware()
     
     with tf.device(device):
-        train_ds, val_ds, class_names = load_data_with_opencv()
+        train_ds, val_ds = load_data_with_opencv()
         
         if train_ds is None:
             return
 
-        model = build_model(num_classes=len(class_names))
+        model = build_model(num_classes=len(CLASS_NAMES))
         
         print("\n📄 Resumen del Modelo:")
         model.summary()

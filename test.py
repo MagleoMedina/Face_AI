@@ -12,22 +12,40 @@ import cv2 # Importamos OpenCV
 # --- Configuración ---
 MODEL_FILENAME = 'emotion_model.keras'
 CLASSES_FILENAME = 'class_names.json'
+PERSONS_FILENAME = 'person_names.json'
 IMG_HEIGHT = 160
 IMG_WIDTH = 160
 
-# --- Cargar Modelo y Clases ---
+# --- Cargar Modelo, Clases y Nombres de Personas ---
 try:
     model = tf.keras.models.load_model(MODEL_FILENAME)
     with open(CLASSES_FILENAME, 'r') as f:
         class_names = json.load(f)
+    # Intentar cargar los nombres de personas (opcional)
+    if os.path.exists(PERSONS_FILENAME):
+        with open(PERSONS_FILENAME, 'r') as f:
+            person_map = json.load(f)
+    else:
+        person_map = None
     model_loaded = True
-    print("✅ Modelo y clases cargados correctamente.")
+    print("✅ Modelo, clases y nombres de personas cargados correctamente.")
 except Exception as e:
     model = None
     class_names = None
+    person_map = None
     model_loaded = False
-    print(f"❌ Error al cargar el modelo o las clases: {e}")
+    print(f"❌ Error al cargar el modelo, las clases o los nombres de personas: {e}")
     print(f"Asegúrate de que los archivos '{MODEL_FILENAME}' y '{CLASSES_FILENAME}' existan.")
+
+def get_person_name_from_filename(filename):
+    """Extrae el nombre de la persona desde el nombre del archivo."""
+    base = os.path.basename(filename)
+    if base.startswith("Magleo_"):
+        return "Magleo"
+    elif base.startswith("Hector_"):
+        return "Hector"
+    else:
+        return "desconocido"
 
 def predict_emotion(image_path):
     """
@@ -68,10 +86,11 @@ def predict_emotion(image_path):
     # Realizar la predicción
     predictions = model.predict(img_array)
     score = tf.nn.softmax(predictions[0])
-    
     predicted_emotion = class_names[np.argmax(score)]
     confidence = 100 * np.max(score)
-    result_text = f"Emoción Predicha: {predicted_emotion} ({confidence:.2f}%)"
+    # --- Nuevo: obtener nombre de persona ---
+    person_name = get_person_name_from_filename(image_path)
+    result_text = f"Persona: {person_name} | Emoción: {predicted_emotion} ({confidence:.2f}%)"
     
     print(f"Imagen: {os.path.basename(image_path)} -> {result_text}")
     return result_text, rgb_img # Devolvemos la imagen procesada (RGB)
