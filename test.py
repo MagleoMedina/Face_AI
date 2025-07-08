@@ -31,22 +31,32 @@ except Exception as e:
 
 def predict_emotion(image_path):
     """
-    Carga una imagen con OpenCV, la preprocesa y predice la emoción.
+    Carga una imagen con OpenCV, detecta el rostro, la preprocesa y predice la emoción.
     """
     if not model:
         return "Error: Modelo no cargado.", None
 
-    # Cargar la imagen usando OpenCV
     img = cv2.imread(image_path)
     if img is None:
         return "Error: No se pudo cargar la imagen.", None
 
-    # 1. Redimensionar la imagen
-    resized_img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
-    # 2. Convertir de BGR a RGB
+    # Cargar el clasificador Haar Cascade para detección de rostros
+    haar_cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(haar_cascade_path)
+    if face_cascade.empty():
+        return "Error: No se pudo cargar el clasificador Haar Cascade.", None
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4)
+    if len(faces) == 0:
+        return "Error: No se detectó rostro en la imagen.", None
+
+    # Tomar el primer rostro detectado
+    (x, y, w, h) = faces[0]
+    face_img = img[y:y+h, x:x+w]
+    resized_img = cv2.resize(face_img, (IMG_WIDTH, IMG_HEIGHT))
     rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
-    
-    # Convertir a array de numpy y añadir dimensión de batch
+
     img_array = np.array(rgb_img)
     img_array = np.expand_dims(img_array, 0)
 

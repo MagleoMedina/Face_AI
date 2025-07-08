@@ -43,12 +43,21 @@ def setup_hardware():
 def load_data_with_opencv():
     """
     Carga, redimensiona y preprocesa imágenes usando OpenCV.
+    Detecta y recorta el rostro antes de alimentar al modelo.
     """
     if not os.path.exists(DATA_DIR):
         print(f"❌ Error: El directorio de datos '{DATA_DIR}' no existe.")
         return None, None, None
 
     print("🔄 Cargando y preprocesando imágenes con OpenCV...")
+
+    # Cargar el clasificador Haar Cascade para detección de rostros
+    haar_cascade_path = cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    face_cascade = cv2.CascadeClassifier(haar_cascade_path)
+    if face_cascade.empty():
+        print("❌ Error: No se pudo cargar el clasificador Haar Cascade para rostros.")
+        return None, None, None
+
     images = []
     labels = []
     
@@ -73,14 +82,22 @@ def load_data_with_opencv():
         class_path = os.path.join(DATA_DIR, class_name)
         for img_name in os.listdir(class_path):
             img_path = os.path.join(class_path, img_name)
-            # Cargar imagen con OpenCV
             img = cv2.imread(img_path)
             if img is not None:
-                # 1. Redimensionar la imagen a las dimensiones deseadas
-                img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
-                # 2. Convertir de BGR (default de OpenCV) a RGB (default de TensorFlow)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                images.append(img)
+                # Convertir a escala de grises para la detección de rostros
+                gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4)
+                if len(faces) == 0:
+                    print(f"⚠️ Advertencia: No se detectó rostro en '{img_path}'. Se omitirá.")
+                    continue
+                # Tomar el primer rostro detectado
+                (x, y, w, h) = faces[0]
+                face_img = img[y:y+h, x:x+w]
+                # Redimensionar el rostro detectado
+                face_img = cv2.resize(face_img, (IMG_WIDTH, IMG_HEIGHT))
+                # Convertir de BGR a RGB
+                face_img = cv2.cvtColor(face_img, cv2.COLOR_BGR2RGB)
+                images.append(face_img)
                 labels.append(label_idx)
 
     # Convertir listas a arrays de NumPy
