@@ -47,7 +47,12 @@ def predict_emotion(image_path):
         return "Error: No se pudo cargar el clasificador Haar Cascade.", None
 
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4)
+    # Parámetros ajustados para ampliar el rango de detección
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=1.05,  # Más sensible (antes 1.1)
+        minNeighbors=2     # Menos estricto (antes 4)
+    )
     if len(faces) == 0:
         return "Error: No se detectó rostro en la imagen.", None
 

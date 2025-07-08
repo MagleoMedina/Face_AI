@@ -86,7 +86,12 @@ def load_data_with_opencv():
             if img is not None:
                 # Convertir a escala de grises para la detección de rostros
                 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-                faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=4)
+                # Parámetros ajustados para ampliar el rango de detección
+                faces = face_cascade.detectMultiScale(
+                    gray,
+                    scaleFactor=1.05,  # Más sensible (antes 1.1)
+                    minNeighbors=2     # Menos estricto (antes 4)
+                )
                 if len(faces) == 0:
                     print(f"⚠️ Advertencia: No se detectó rostro en '{img_path}'. Se omitirá.")
                     continue
