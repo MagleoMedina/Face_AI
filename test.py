@@ -13,7 +13,7 @@ IMG_SIZE = (224, 224)
 CONFIDENCE_THRESHOLD = 0.7 # Umbral de confianza para determinar si es "DESCONOCIDO"
 
 # Clases (deben coincidir con el script de entrenamiento)
-EMOTION_CLASSES = ['Alegre', 'Triste', 'Pensativo', 'Ira', 'Cansado', 'Sorprendido', 'Riendo']
+EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
 PERSON_CLASSES = ['Magleo', 'Hector']
 
 

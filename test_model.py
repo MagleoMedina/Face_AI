@@ -16,7 +16,7 @@ EPOCHS = 25
 BATCH_SIZE = 32
 
 # Clases de emociones y personas
-EMOTION_CLASSES = ['Alegre', 'triste', 'pensativo', 'con_ira', 'cansado', 'sorprendido', 'riendo']
+EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
 PERSON_CLASSES = ['Magleo', 'Hector']
 
 def load_data():
