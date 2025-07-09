@@ -124,7 +124,7 @@ if __name__ == "__main__":
 
         # Dividir los datos en conjuntos de entrenamiento y validación
         X_train, X_val, y_emotion_train, y_emotion_val, y_person_train, y_person_val = train_test_split(
-            images, y_emotion, y_person, test_size=0.2, random_state=42, stratify=emotion_labels
+            images, y_emotion, y_person, test_size=0.3, random_state=42, stratify=emotion_labels
         )
 
         # Construir el modelo
