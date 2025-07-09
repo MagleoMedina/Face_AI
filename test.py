@@ -10,7 +10,7 @@ import tensorflow as tf
 # --- Constantes y Configuraciones ---
 MODEL_PATH = 'model_emotions.keras'
 IMG_SIZE = (224, 224)
-CONFIDENCE_THRESHOLD = 0.7 # Umbral de confianza para determinar si es "DESCONOCIDO"
+CONFIDENCE_THRESHOLD = 1 # Umbral de confianza para determinar si es "DESCONOCIDO"
 
 # Clases (deben coincidir con el script de entrenamiento)
 EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
@@ -79,12 +79,28 @@ class App(ctk.CTk):
         
         # Preprocesar la imagen para el modelo
         try:
-            img_array = cv2.imread(file_path)
-            img_resized = cv2.resize(img_array, IMG_SIZE)
+            # --- Carga compatible con nombres UTF-8 ---
+            with open(file_path, "rb") as f:
+                file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
+                img_array = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            # --- Validación de rostro ---
+            gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+            if len(faces) == 0:
+                self.person_label.configure(text="No se detecta rostro")
+                self.emotion_label.configure(text="Emoción: --")
+                return
+            # --- Extraer solo el rostro para la predicción de persona ---
+            x, y, w, h = faces[0]  # Tomar el primer rostro detectado
+            face_img = img_array[y:y+h, x:x+w]
+            # Redimensionar el rostro extraído al tamaño requerido por el modelo
+            img_resized = cv2.resize(face_img, IMG_SIZE)
             img_normalized = img_resized / 255.0
             img_batch = np.expand_dims(img_normalized, axis=0)
         except Exception as e:
             self.person_label.configure(text=f"Error al procesar imagen: {e}")
+            self.emotion_label.configure(text="Emoción: --")
             return
             
         # Realizar la predicción
@@ -103,8 +119,10 @@ class App(ctk.CTk):
 
         if person_confidence >= CONFIDENCE_THRESHOLD:
             predicted_person = PERSON_CLASSES[person_index]
+            print(f"Predicción de persona: {predicted_person} (Confianza: {person_confidence})")
         else:
             predicted_person = "DESCONOCIDO"
+            print(f"Predicción de emoción: {predicted_emotion} (Índice: {emotion_index})")
 
         # Actualizar las etiquetas de resultados
         self.person_label.configure(text=f"Persona: {predicted_person}")
