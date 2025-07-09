@@ -8,11 +8,12 @@ from keras.models import Model
 from keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
+from sklearn.metrics import confusion_matrix, classification_report
 
 # --- Constantes y Configuraciones ---
 DATA_DIR = 'images'
 IMG_SIZE = (224, 224) # Tamaño estándar para las imágenes
-EPOCHS = 25
+EPOCHS = 14 # Puedes considerar aumentar esto a 30-50 si el modelo sigue aprendiendo
 BATCH_SIZE = 32
 
 # Clases de emociones y personas
@@ -60,7 +61,7 @@ def load_data():
                 images.append(img)
                 emotion_labels.append(emotion_label)
                 person_labels.append(person_label)
-                print(f"Imagen procesada: {img_file} | Emoción: {emotion_folder} | Persona: {PERSON_CLASSES[person_label]}")
+                # print(f"Imagen procesada: {img_file} | Emoción: {emotion_folder} | Persona: {PERSON_CLASSES[person_label]}")
 
             except Exception as e:
                 print(f"Error al procesar la imagen {img_file}: {e}")
@@ -70,24 +71,25 @@ def load_data():
 
 def build_model():
     """
-    Construye un modelo CNN con dos ramas de salida (multi-output).
+    Construye un modelo CNN con dos ramas de salida (multi-output), sin aumento de datos.
     """
     # Entrada
     input_layer = Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3), name='input_layer')
 
-    # Base Convolucional
-    x = Conv2D(32, (3, 3), activation='relu')(input_layer)
+    # Base Convolucional (sin capas de aumento de datos aquí)
+    x = Conv2D(32, (3, 3), activation='relu')(input_layer) # Conecta directamente a input_layer
     x = MaxPooling2D((2, 2))(x)
     x = Conv2D(64, (3, 3), activation='relu')(x)
     x = MaxPooling2D((2, 2))(x)
     x = Conv2D(128, (3, 3), activation='relu')(x)
     x = MaxPooling2D((2, 2))(x)
-    x = Dropout(0.3)(x)
+    x = Dropout(0.3)(x) # Dropout general para la base convolucional
     x = Flatten()(x)
 
     # Rama 1: Clasificación de Emociones
-    emotion_branch = Dense(128, activation='relu')(x)
-    emotion_branch = Dropout(0.5)(emotion_branch)
+    emotion_branch = Dense(256, activation='relu')(x)
+    emotion_branch = Dropout(0.4)(emotion_branch)
+    emotion_branch = Dense(128, activation='relu')(emotion_branch)
     emotion_output = Dense(len(EMOTION_CLASSES), activation='softmax', name='emotion_output')(emotion_branch)
 
     # Rama 2: Clasificación de Personas
@@ -103,6 +105,10 @@ def build_model():
         loss={
             'emotion_output': 'categorical_crossentropy',
             'person_output': 'categorical_crossentropy'
+        },
+        loss_weights={
+            'emotion_output': 2, # Mayor peso para la pérdida de emoción
+            'person_output': 0.5   # Menor peso para la pérdida de persona
         },
         metrics={
             'emotion_output': 'accuracy',
@@ -144,3 +150,17 @@ if __name__ == "__main__":
         # Guardar el modelo entrenado
         model.save('model_emotions.keras')
         print("\n✅ Entrenamiento finalizado. Modelo guardado como 'model_emotions.keras'")
+
+        # --- Evaluación Adicional para Emociones (Matriz de Confusión) ---
+        print("\n--- Evaluación de la Clasificación de Emociones ---")
+        emotion_val_predictions, _ = model.predict(X_val)
+        y_pred_emotion = np.argmax(emotion_val_predictions, axis=1)
+        y_true_emotion = np.argmax(y_emotion_val, axis=1)
+
+        cm = confusion_matrix(y_true_emotion, y_pred_emotion)
+        print("\nMatriz de Confusión para Emociones:")
+        print(cm)
+
+        report = classification_report(y_true_emotion, y_pred_emotion, target_names=EMOTION_CLASSES)
+        print("\nReporte de Clasificación para Emociones:")
+        print(report)
