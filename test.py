@@ -34,7 +34,7 @@ class App(ctk.CTk):
             print(f"❌ Error al cargar el modelo: {e}")
             self.model = None
 
-        # --- Widgets de la Interfaz ---
+        # Widgets de la Interfaz 
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(pady=20, padx=20, fill="both", expand=True)
 

@@ -1,5 +1,3 @@
-# test_model.py
-
 import os
 import cv2
 import numpy as np
@@ -9,12 +7,15 @@ from keras.layers import Input, Conv2D, MaxPooling2D, Flatten, Dense, Dropout
 from keras.utils import to_categorical
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import confusion_matrix, classification_report
+import matplotlib.pyplot as plt
+import seaborn as sns
 
 # --- Constantes y Configuraciones ---
 DATA_DIR = 'images'
 IMG_SIZE = (224, 224) # Tamaño estándar para las imágenes
-EPOCHS = 14 # Puedes considerar aumentar esto a 30-50 si el modelo sigue aprendiendo
+EPOCHS = 14 
 BATCH_SIZE = 32
+GRAPHICS_DIR = 'graphics' # Directorio para guardar las gráficas
 
 # Clases de emociones y personas
 EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
@@ -76,7 +77,7 @@ def build_model():
     # Entrada
     input_layer = Input(shape=(IMG_SIZE[0], IMG_SIZE[1], 3), name='input_layer')
 
-    # Base Convolucional (sin capas de aumento de datos aquí)
+    # Base Convolucional 
     x = Conv2D(32, (3, 3), activation='relu')(input_layer) # Conecta directamente a input_layer
     x = MaxPooling2D((2, 2))(x)
     x = Conv2D(64, (3, 3), activation='relu')(x)
@@ -107,7 +108,7 @@ def build_model():
             'person_output': 'categorical_crossentropy'
         },
         loss_weights={
-            'emotion_output': 2, # Mayor peso para la pérdida de emoción
+            'emotion_output': 1.7, # Mayor peso para la pérdida de emoción
             'person_output': 0.5   # Menor peso para la pérdida de persona
         },
         metrics={
@@ -118,12 +119,43 @@ def build_model():
     return model
 
 if __name__ == "__main__":
+    # Crear la carpeta de gráficos si no existe
+    if not os.path.exists(GRAPHICS_DIR):
+        os.makedirs(GRAPHICS_DIR)
+        print(f"Directorio '{GRAPHICS_DIR}' creado.")
+
     # Cargar y preparar los datos
     images, emotion_labels, person_labels = load_data()
 
     if len(images) == 0:
         print("No se encontraron imágenes. Asegúrate de que la estructura de carpetas sea correcta.")
     else:
+        # --- Gráficas de Distribución de Clases ---
+        print("\n--- Generando Gráficas de Distribución de Clases ---")
+        unique_emotions, counts_emotions = np.unique(emotion_labels, return_counts=True)
+        plt.figure(figsize=(10, 6))
+        plt.bar([EMOTION_CLASSES[i] for i in unique_emotions], counts_emotions, color='skyblue')
+        plt.title('Distribución de Clases de Emoción')
+        plt.xlabel('Emoción')
+        plt.ylabel('Número de Imágenes')
+        plt.xticks(rotation=45, ha='right')
+        plt.tight_layout()
+        plt.savefig(os.path.join(GRAPHICS_DIR, 'emotion_class_distribution.png'))
+        plt.close()
+        print(f"Gráfica de distribución de emociones guardada en {GRAPHICS_DIR}/emotion_class_distribution.png")
+
+        unique_persons, counts_persons = np.unique(person_labels, return_counts=True)
+        plt.figure(figsize=(6, 4))
+        plt.bar([PERSON_CLASSES[i] for i in unique_persons], counts_persons, color='lightcoral')
+        plt.title('Distribución de Clases de Persona')
+        plt.xlabel('Persona')
+        plt.ylabel('Número de Imágenes')
+        plt.tight_layout()
+        plt.savefig(os.path.join(GRAPHICS_DIR, 'person_class_distribution.png'))
+        plt.close()
+        print(f"Gráfica de distribución de personas guardada en {GRAPHICS_DIR}/person_class_distribution.png")
+
+
         # Convertir etiquetas a formato categórico (one-hot encoding)
         y_emotion = to_categorical(emotion_labels, num_classes=len(EMOTION_CLASSES))
         y_person = to_categorical(person_labels, num_classes=len(PERSON_CLASSES))
@@ -151,16 +183,99 @@ if __name__ == "__main__":
         model.save('model_emotions.keras')
         print("\n✅ Entrenamiento finalizado. Modelo guardado como 'model_emotions.keras'")
 
-        # --- Evaluación Adicional para Emociones (Matriz de Confusión) ---
+        # --- Gráficas de Pérdida y Precisión durante el Entrenamiento ---
+        print("\n--- Generando Gráficas de Pérdida y Precisión ---")
+        plt.figure(figsize=(14, 6))
+
+        # Pérdida Total
+        plt.subplot(1, 2, 1)
+        plt.plot(history.history['loss'], label='Pérdida de Entrenamiento')
+        plt.plot(history.history['val_loss'], label='Pérdida de Validación')
+        plt.title('Curvas de Pérdida Total')
+        plt.xlabel('Época')
+        plt.ylabel('Pérdida')
+        plt.legend()
+        plt.grid(True)
+
+        # Precisión de Emoción
+        plt.subplot(1, 2, 2)
+        plt.plot(history.history['emotion_output_accuracy'], label='Precisión Emoción (Entrenamiento)')
+        plt.plot(history.history['val_emotion_output_accuracy'], label='Precisión Emoción (Validación)')
+        plt.title('Curvas de Precisión de Emoción')
+        plt.xlabel('Época')
+        plt.ylabel('Precisión')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(GRAPHICS_DIR, 'training_loss_emotion_accuracy.png'))
+        plt.close()
+        print(f"Gráfica de pérdida y precisión de emoción guardada en {GRAPHICS_DIR}/training_loss_emotion_accuracy.png")
+
+        # Precisión de Persona
+        plt.figure(figsize=(7, 6))
+        plt.plot(history.history['person_output_accuracy'], label='Precisión Persona (Entrenamiento)')
+        plt.plot(history.history['val_person_output_accuracy'], label='Precisión Persona (Validación)')
+        plt.title('Curvas de Precisión de Persona')
+        plt.xlabel('Época')
+        plt.ylabel('Precisión')
+        plt.legend()
+        plt.grid(True)
+        plt.tight_layout()
+        plt.savefig(os.path.join(GRAPHICS_DIR, 'training_person_accuracy.png'))
+        plt.close()
+        print(f"Gráfica de precisión de persona guardada en {GRAPHICS_DIR}/training_person_accuracy.png")
+
+
+        # Matriz de Confusión y Reporte
         print("\n--- Evaluación de la Clasificación de Emociones ---")
-        emotion_val_predictions, _ = model.predict(X_val)
+        emotion_val_predictions, person_val_predictions = model.predict(X_val) # Obtener ambas salidas
+
         y_pred_emotion = np.argmax(emotion_val_predictions, axis=1)
         y_true_emotion = np.argmax(y_emotion_val, axis=1)
 
-        cm = confusion_matrix(y_true_emotion, y_pred_emotion)
+        cm_emotion = confusion_matrix(y_true_emotion, y_pred_emotion)
         print("\nMatriz de Confusión para Emociones:")
-        print(cm)
+        print(cm_emotion)
 
-        report = classification_report(y_true_emotion, y_pred_emotion, target_names=EMOTION_CLASSES)
+        report_emotion = classification_report(y_true_emotion, y_pred_emotion, target_names=EMOTION_CLASSES)
         print("\nReporte de Clasificación para Emociones:")
-        print(report)
+        print(report_emotion)
+
+        # Heatmap de Matriz de Confusión para Emociones 
+        print("\n--- Generando Heatmap de Matriz de Confusión para Emociones ---")
+        plt.figure(figsize=(10, 8))
+        sns.heatmap(cm_emotion, annot=True, fmt='d', cmap='Blues',
+                    xticklabels=EMOTION_CLASSES, yticklabels=EMOTION_CLASSES, cbar=False)
+        plt.title('Matriz de Confusión para Emociones')
+        plt.xlabel('Predicción')
+        plt.ylabel('Verdadero')
+        plt.tight_layout()
+        plt.savefig(os.path.join(GRAPHICS_DIR, 'confusion_matrix_emotions.png'))
+        plt.close()
+        print(f"Heatmap de matriz de confusión para emociones guardado en {GRAPHICS_DIR}/confusion_matrix_emotions.png")
+
+        # Matriz de Confusión y Reporte
+        print("\n--- Evaluación de la Clasificación de Personas ---")
+        y_pred_person = np.argmax(person_val_predictions, axis=1)
+        y_true_person = np.argmax(y_person_val, axis=1)
+
+        cm_person = confusion_matrix(y_true_person, y_pred_person)
+        print("\nMatriz de Confusión para Personas:")
+        print(cm_person)
+
+        report_person = classification_report(y_true_person, y_pred_person, target_names=PERSON_CLASSES)
+        print("\nReporte de Clasificación para Personas:")
+        print(report_person)
+
+        #  Heatmap de Matriz de Confusión para Personas 
+        print("\n--- Generando Heatmap de Matriz de Confusión para Personas ---")
+        plt.figure(figsize=(6, 5))
+        sns.heatmap(cm_person, annot=True, fmt='d', cmap='Greens',
+                    xticklabels=PERSON_CLASSES, yticklabels=PERSON_CLASSES, cbar=False)
+        plt.title('Matriz de Confusión para Personas')
+        plt.xlabel('Predicción')
+        plt.ylabel('Verdadero')
+        plt.tight_layout()
+        plt.savefig(os.path.join(GRAPHICS_DIR, 'confusion_matrix_persons.png'))
+        plt.close()
+        print(f"Heatmap de matriz de confusión para personas guardado en {GRAPHICS_DIR}/confusion_matrix_persons.png")

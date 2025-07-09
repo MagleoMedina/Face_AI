@@ -26,7 +26,7 @@ def predict_image(model, img_array):
 
 if __name__ == "__main__":
     # Asigna aquí el nombre del archivo de imagen que deseas predecir
-    nombre_archivo = "feli.jpg"  # Cambia este valor por el nombre de tu imagen
+    nombre_archivo = "feli.jpg"  
 
     img_path = os.path.join(os.getcwd(), nombre_archivo)
 
