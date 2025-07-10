@@ -268,7 +268,6 @@ if __name__ == "__main__":
         print(report_person)
 
         #  Heatmap de Matriz de Confusión para Personas 
-        print("\n--- Generando Heatmap de Matriz de Confusión para Personas ---")
         plt.figure(figsize=(6, 5))
         sns.heatmap(cm_person, annot=True, fmt='d', cmap='Greens',
                     xticklabels=PERSON_CLASSES, yticklabels=PERSON_CLASSES, cbar=False)
