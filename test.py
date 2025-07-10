@@ -1,116 +1,147 @@
 # test.py
 
-import os
-import json
-import tkinter as tk
-from tkinter import filedialog, Label, Button, Frame, messagebox
-from PIL import Image, ImageTk
+import customtkinter as ctk
+from tkinter import filedialog
+from PIL import Image
+import cv2
 import numpy as np
 import tensorflow as tf
-import cv2 # Importamos OpenCV
 
-# --- Configuración ---
-MODEL_FILENAME = 'emotion_model.keras'
-CLASSES_FILENAME = 'class_names.json'
-IMG_HEIGHT = 160
-IMG_WIDTH = 160
+# --- Constantes y Configuraciones ---
+MODEL_PATH = 'model_emotions.keras'
+IMG_SIZE = (224, 224)
+CONFIDENCE_THRESHOLD = 0.7 # Umbral de confianza para determinar si es "DESCONOCIDO"
+# Clases (deben coincidir con el script de entrenamiento)
+EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
+PERSON_CLASSES = ['Magleo', 'Hector']
 
-# --- Cargar Modelo y Clases ---
-try:
-    model = tf.keras.models.load_model(MODEL_FILENAME)
-    with open(CLASSES_FILENAME, 'r') as f:
-        class_names = json.load(f)
-    model_loaded = True
-    print("✅ Modelo y clases cargados correctamente.")
-except Exception as e:
-    model = None
-    class_names = None
-    model_loaded = False
-    print(f"❌ Error al cargar el modelo o las clases: {e}")
-    print(f"Asegúrate de que los archivos '{MODEL_FILENAME}' y '{CLASSES_FILENAME}' existan.")
 
-def predict_emotion(image_path):
-    """
-    Carga una imagen con OpenCV, la preprocesa y predice la emoción.
-    """
-    if not model:
-        return "Error: Modelo no cargado.", None
+class App(ctk.CTk):
+    def __init__(self):
+        super().__init__()
 
-    # Cargar la imagen usando OpenCV
-    img = cv2.imread(image_path)
-    if img is None:
-        return "Error: No se pudo cargar la imagen.", None
+        self.title("Detector de Emociones y Personas - UNEG")
+        self.geometry("600x550")
+        self.resizable(False, False)
+        ctk.set_appearance_mode("dark")
 
-    # 1. Redimensionar la imagen
-    resized_img = cv2.resize(img, (IMG_WIDTH, IMG_HEIGHT))
-    # 2. Convertir de BGR a RGB
-    rgb_img = cv2.cvtColor(resized_img, cv2.COLOR_BGR2RGB)
-    
-    # Convertir a array de numpy y añadir dimensión de batch
-    img_array = np.array(rgb_img)
-    img_array = np.expand_dims(img_array, 0)
+        # Cargar el modelo
+        try:
+            self.model = tf.keras.models.load_model(MODEL_PATH)
+            print("✅ Modelo cargado exitosamente.")
+        except Exception as e:
+            print(f"❌ Error al cargar el modelo: {e}")
+            self.model = None
 
-    # Realizar la predicción
-    predictions = model.predict(img_array)
-    score = tf.nn.softmax(predictions[0])
-    
-    predicted_emotion = class_names[np.argmax(score)]
-    confidence = 100 * np.max(score)
-    result_text = f"Emoción Predicha: {predicted_emotion} ({confidence:.2f}%)"
-    
-    print(f"Imagen: {os.path.basename(image_path)} -> {result_text}")
-    return result_text, rgb_img # Devolvemos la imagen procesada (RGB)
+        # Widgets de la Interfaz 
+        self.main_frame = ctk.CTkFrame(self)
+        self.main_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
-def select_image():
-    """Abre un diálogo para seleccionar una imagen y muestra la predicción."""
-    if not model_loaded:
-        messagebox.showerror("Error", f"No se pudo cargar el modelo desde '{MODEL_FILENAME}'.")
-        return
-
-    file_path = filedialog.askopenfilename(
-        title="Selecciona una imagen de un rostro",
-        filetypes=[("Archivos de Imagen", "*.png *.jpg *.jpeg *.bmp")]
-    )
-    if not file_path:
-        return
-
-    prediction_text, processed_img = predict_emotion(file_path)
-
-    if processed_img is not None:
-        # Convertir la imagen procesada de OpenCV/Numpy a un formato para Tkinter
-        img_pil = Image.fromarray(processed_img)
-        img_pil.thumbnail((350, 350))
-        img_tk = ImageTk.PhotoImage(img_pil)
+        self.load_button = ctk.CTkButton(self.main_frame, text="Cargar Imagen", command=self.load_and_predict_image)
+        self.load_button.pack(pady=10)
         
-        image_label.config(image=img_tk)
-        image_label.image = img_tk
-        result_label.config(text=prediction_text, fg="blue")
-    else:
-        messagebox.showerror("Error de Imagen", prediction_text)
+        # Etiqueta para mostrar la imagen
+        self.image_label = ctk.CTkLabel(self.main_frame, text="")
+        self.image_label.pack(pady=10)
+        
+        # Frame para los resultados
+        self.results_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
+        self.results_frame.pack(pady=20, padx=20)
 
-def create_gui():
-    """Crea y ejecuta la interfaz gráfica con Tkinter."""
-    root = tk.Tk()
-    root.title("Clasificador de Emociones Faciales")
-    root.geometry("450x550")
-    root.configure(bg="#f0f0f0")
-    
-    main_frame = Frame(root, bg="#f0f0f0", padx=20, pady=20)
-    main_frame.pack(expand=True, fill=tk.BOTH)
+        self.person_label = ctk.CTkLabel(self.results_frame, text="Persona: --", font=("Helvetica", 18, "bold"))
+        self.person_label.grid(row=0, column=0, padx=20)
 
-    Label(main_frame, text="Probador de Modelo de Emociones", font=("Helvetica", 16, "bold"), bg="#f0f0f0").pack(pady=(0, 20))
-    
-    global image_label
-    image_label = Label(main_frame, bg="#e0e0e0", text="Selecciona una imagen para verla aquí", width=50, height=20)
-    image_label.pack(pady=10)
+        self.emotion_label = ctk.CTkLabel(self.results_frame, text="Emoción: --", font=("Helvetica", 18, "bold"))
+        self.emotion_label.grid(row=0, column=1, padx=20)
 
-    global result_label
-    result_label = Label(main_frame, text="La predicción aparecerá aquí", font=("Helvetica", 14), bg="#f0f0f0", fg="black")
-    result_label.pack(pady=10)
 
-    Button(main_frame, text="🖼️ Seleccionar Imagen y Predecir", command=select_image, font=("Helvetica", 12), bg="#007BFF", fg="white", relief=tk.RAISED, borderwidth=2).pack(pady=20, ipady=5, ipadx=10)
-    
-    root.mainloop()
+    def load_and_predict_image(self):
+        """
+        Abre un diálogo para seleccionar una imagen, la procesa y realiza la predicción.
+        """
+        if not self.model:
+            self.person_label.configure(text="Error: Modelo no cargado")
+            return
+
+        file_path = filedialog.askopenfilename(
+            title="Selecciona una imagen",
+            filetypes=[("Image files", "*.jpg *.jpeg *.png")]
+        )
+
+        if not file_path:
+            return
+
+        # Cargar y mostrar la imagen en la GUI
+        pil_image = Image.open(file_path)
+        # --- Corregir orientación usando EXIF ---
+        try:
+            exif = pil_image._getexif()
+            if exif is not None:
+                orientation_key = 274  # cf. ExifTags
+                if orientation_key in exif:
+                    orientation = exif[orientation_key]
+                    if orientation == 3:
+                        pil_image = pil_image.rotate(180, expand=True)
+                    elif orientation == 6:
+                        pil_image = pil_image.rotate(270, expand=True)
+                    elif orientation == 8:
+                        pil_image = pil_image.rotate(90, expand=True)
+        except Exception as e:
+            print(f"Advertencia al corregir orientación: {e}")
+        display_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(300, 300))
+        self.image_label.configure(image=display_image)
+        
+        # Preprocesar la imagen para el modelo
+        try:
+            # --- Carga compatible con nombres UTF-8 ---
+            # Convertir PIL corregido a array para OpenCV
+            img_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
+            # --- Validación de rostro ---
+            gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+            if len(faces) == 0:
+                self.person_label.configure(text="No se detecta rostro")
+                self.emotion_label.configure(text="Emoción: --")
+                return
+            # --- Extraer solo el rostro para la predicción de persona ---
+            x, y, w, h = faces[0]  # Tomar el primer rostro detectado
+            face_img = img_array[y:y+h, x:x+w]
+            # Redimensionar el rostro extraído al tamaño requerido por el modelo
+            img_resized = cv2.resize(face_img, IMG_SIZE)
+            img_normalized = img_resized / 255.0
+            img_batch = np.expand_dims(img_normalized, axis=0)
+        except Exception as e:
+            self.person_label.configure(text=f"Error al procesar imagen: {e}")
+            self.emotion_label.configure(text="Emoción: --")
+            return
+            
+        # Realizar la predicción
+        predictions = self.model.predict(img_batch)
+        emotion_preds = predictions[0][0]
+        person_preds = predictions[1][0]
+
+        # Interpretar los resultados
+        # Emoción
+        emotion_index = np.argmax(emotion_preds)
+        predicted_emotion = EMOTION_CLASSES[emotion_index]
+
+        # Persona
+        person_index = np.argmax(person_preds)
+        person_confidence = person_preds[person_index]
+
+        if person_confidence >= CONFIDENCE_THRESHOLD:
+            predicted_person = PERSON_CLASSES[person_index]
+            print(f"Predicción de persona: {predicted_person} (Confianza: {person_confidence})")
+        else:
+            predicted_person = "DESCONOCIDO"
+            print(f"Predicción de emoción: {predicted_emotion} (Confianza: {person_confidence})")
+
+        # Actualizar las etiquetas de resultados
+        self.person_label.configure(text=f"Persona: {predicted_person}")
+        self.emotion_label.configure(text=f"Emoción: {predicted_emotion}")
+
 
 if __name__ == "__main__":
-    create_gui()
+    app = App()
+    app.mainloop()
