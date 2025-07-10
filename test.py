@@ -10,8 +10,7 @@ import tensorflow as tf
 # --- Constantes y Configuraciones ---
 MODEL_PATH = 'model_emotions.keras'
 IMG_SIZE = (224, 224)
-CONFIDENCE_THRESHOLD = 1 # Umbral de confianza para determinar si es "DESCONOCIDO"
-
+CONFIDENCE_THRESHOLD = 0.7 # Umbral de confianza para determinar si es "DESCONOCIDO"
 # Clases (deben coincidir con el script de entrenamiento)
 EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
 PERSON_CLASSES = ['Magleo', 'Hector']
@@ -74,15 +73,29 @@ class App(ctk.CTk):
 
         # Cargar y mostrar la imagen en la GUI
         pil_image = Image.open(file_path)
+        # --- Corregir orientación usando EXIF ---
+        try:
+            exif = pil_image._getexif()
+            if exif is not None:
+                orientation_key = 274  # cf. ExifTags
+                if orientation_key in exif:
+                    orientation = exif[orientation_key]
+                    if orientation == 3:
+                        pil_image = pil_image.rotate(180, expand=True)
+                    elif orientation == 6:
+                        pil_image = pil_image.rotate(270, expand=True)
+                    elif orientation == 8:
+                        pil_image = pil_image.rotate(90, expand=True)
+        except Exception as e:
+            print(f"Advertencia al corregir orientación: {e}")
         display_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(300, 300))
         self.image_label.configure(image=display_image)
         
         # Preprocesar la imagen para el modelo
         try:
             # --- Carga compatible con nombres UTF-8 ---
-            with open(file_path, "rb") as f:
-                file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
-                img_array = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            # Convertir PIL corregido a array para OpenCV
+            img_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             # --- Validación de rostro ---
             gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
@@ -122,7 +135,7 @@ class App(ctk.CTk):
             print(f"Predicción de persona: {predicted_person} (Confianza: {person_confidence})")
         else:
             predicted_person = "DESCONOCIDO"
-            print(f"Predicción de emoción: {predicted_emotion} (Índice: {emotion_index})")
+            print(f"Predicción de emoción: {predicted_emotion} (Confianza: {person_confidence})")
 
         # Actualizar las etiquetas de resultados
         self.person_label.configure(text=f"Persona: {predicted_person}")
