@@ -10,7 +10,7 @@ import tensorflow as tf
 # --- Constantes y Configuraciones ---
 MODEL_PATH = 'model_emotions.keras'
 IMG_SIZE = (224, 224)
-CONFIDENCE_THRESHOLD = 0.7 # Umbral de confianza para determinar si es "DESCONOCIDO"
+CONFIDENCE_THRESHOLD = 1 # Umbral de confianza para determinar si es "DESCONOCIDO"
 
 # Clases (deben coincidir con el script de entrenamiento)
 EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
@@ -34,7 +34,7 @@ class App(ctk.CTk):
             print(f"❌ Error al cargar el modelo: {e}")
             self.model = None
 
-        # --- Widgets de la Interfaz ---
+        # Widgets de la Interfaz 
         self.main_frame = ctk.CTkFrame(self)
         self.main_frame.pack(pady=20, padx=20, fill="both", expand=True)
 
@@ -74,36 +74,33 @@ class App(ctk.CTk):
 
         # Cargar y mostrar la imagen en la GUI
         pil_image = Image.open(file_path)
-        # --- Corregir orientación usando EXIF ---
-        try:
-            exif = pil_image._getexif()
-            if exif is not None:
-                orientation_key = 274  # cf. ExifTags
-                if orientation_key in exif:
-                    orientation = exif[orientation_key]
-                    if orientation == 3:
-                        pil_image = pil_image.rotate(180, expand=True)
-                    elif orientation == 6:
-                        pil_image = pil_image.rotate(270, expand=True)
-                    elif orientation == 8:
-                        pil_image = pil_image.rotate(90, expand=True)
-        except Exception:
-            pass  # Si no hay EXIF o error, continuar sin rotar
-
         display_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(300, 300))
         self.image_label.configure(image=display_image)
         
         # Preprocesar la imagen para el modelo
         try:
-            # Convertir PIL a array OpenCV después de corregir orientación
-            pil_image_for_cv = pil_image.convert('RGB')
-            img_array = np.array(pil_image_for_cv)
-            img_array = cv2.cvtColor(img_array, cv2.COLOR_RGB2BGR)
-            img_resized = cv2.resize(img_array, IMG_SIZE)
+            # --- Carga compatible con nombres UTF-8 ---
+            with open(file_path, "rb") as f:
+                file_bytes = np.asarray(bytearray(f.read()), dtype=np.uint8)
+                img_array = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
+            # --- Validación de rostro ---
+            gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
+            face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
+            if len(faces) == 0:
+                self.person_label.configure(text="No se detecta rostro")
+                self.emotion_label.configure(text="Emoción: --")
+                return
+            # --- Extraer solo el rostro para la predicción de persona ---
+            x, y, w, h = faces[0]  # Tomar el primer rostro detectado
+            face_img = img_array[y:y+h, x:x+w]
+            # Redimensionar el rostro extraído al tamaño requerido por el modelo
+            img_resized = cv2.resize(face_img, IMG_SIZE)
             img_normalized = img_resized / 255.0
             img_batch = np.expand_dims(img_normalized, axis=0)
         except Exception as e:
             self.person_label.configure(text=f"Error al procesar imagen: {e}")
+            self.emotion_label.configure(text="Emoción: --")
             return
             
         # Realizar la predicción
@@ -122,8 +119,10 @@ class App(ctk.CTk):
 
         if person_confidence >= CONFIDENCE_THRESHOLD:
             predicted_person = PERSON_CLASSES[person_index]
+            print(f"Predicción de persona: {predicted_person} (Confianza: {person_confidence})")
         else:
             predicted_person = "DESCONOCIDO"
+            print(f"Predicción de emoción: {predicted_emotion} (Índice: {emotion_index})")
 
         # Actualizar las etiquetas de resultados
         self.person_label.configure(text=f"Persona: {predicted_person}")
