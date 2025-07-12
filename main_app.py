@@ -327,31 +327,46 @@ class ChatApp(ctk.CTk):
             self.disable_chat()
 
     def update_ui_for_user(self, person, emotion):
+        # Si el chat ya tiene mensajes, solo actualiza la info y el usuario/emoción, no reinicia el historial
+        if self.current_chat_id and self.chats_data[self.current_chat_id]["history"]:
+            self.current_user = person
+            self.current_emotion = emotion
+            info_text = f"Persona: {person} | Emoción: {emotion}"
+            self.info_label.configure(text=info_text)
+            # Actualiza los datos del chat actual
+            self.chats_data[self.current_chat_id]["user"] = person
+            self.chats_data[self.current_chat_id]["emotion"] = emotion
+            # Añade un mensaje del sistema y bienvenida usando build_dynamic_prompt
+            prompt_config = build_dynamic_prompt(person, emotion)
+            system_msg = {
+                "role": "system",
+                "content": prompt_config["system_message"]
+            }
+            self.chat_history.append(system_msg)
+            self.add_message("Visionary", prompt_config["welcome_message"])
+            self.save_chat_history()
+            if person != "DESCONOCIDO":
+                self.enable_chat()
+            else:
+                self.disable_chat()
+            return
+
+        # Si es un chat nuevo o vacío, inicializa el historial y muestra el mensaje de bienvenida
         self.current_user = person
         self.current_emotion = emotion
         prompt_config = build_dynamic_prompt(person, emotion)
-        
         info_text = f"Persona: {person} | Emoción: {emotion}"
         self.info_label.configure(text=info_text)
-
-        # Limpiar chat anterior y configurar el nuevo
         self.chat_display.configure(state="normal")
         self.chat_display.delete("1.0", "end")
-        
-        # Inicializar historial con el mensaje del sistema
         self.chat_history = [{"role": "system", "content": prompt_config["system_message"]}]
-        
-        # Mostrar el mensaje de bienvenida
         self.add_message("Visionary", prompt_config["welcome_message"])
-        
-        # Actualiza el chat actual en el diccionario
         if self.current_chat_id:
             self.chats_data[self.current_chat_id] = {
                 "user": person,
-                "emotion": emotion,  # Guardar emoción
+                "emotion": emotion,
                 "history": self.chat_history.copy()
             }
-        
         if person != "DESCONOCIDO":
             self.enable_chat()
         else:
