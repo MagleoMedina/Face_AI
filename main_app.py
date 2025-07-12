@@ -149,8 +149,16 @@ class ChatApp(ctk.CTk):
         self.chat_selector.grid(row=0, column=0, sticky="ew", padx=(0,10))
         self.new_chat_button = ctk.CTkButton(self.chat_selector_frame, text="Nuevo chat", command=self.create_new_chat)
         self.new_chat_button.grid(row=0, column=1, sticky="ew")
-
-        # Initially, disable chat
+        # Botón para borrar el chat actual (color rojo)
+        self.delete_chat_button = ctk.CTkButton(
+            self.chat_selector_frame,
+            text="Borrar chat",
+            fg_color="red",
+            hover_color="#b30000",
+            command=self.delete_current_chat
+        )
+        self.delete_chat_button.grid(row=0, column=2, sticky="ew", padx=(10,0))
+        # --- Initially, disable chat
         self.disable_chat()
 
     def start_loading_animation(self):
@@ -295,6 +303,10 @@ class ChatApp(ctk.CTk):
         self.current_emotion = chat_data.get("emotion")
         self.chat_history = chat_data.get("history", [])
         
+        # Refresca la imagen del usuario al cambiar de chat
+        self.image_label.configure(image=None)
+        # Elimina el ajuste de width/height para evitar el error de imagen inexistente
+
         self.chat_display.configure(state="normal")
         self.chat_display.delete("1.0", "end")
         for msg in self.chat_history:
@@ -444,6 +456,26 @@ class ChatApp(ctk.CTk):
                 json.dump(self.chats_data, f, indent=4, ensure_ascii=False)
         except Exception as e:
             print(f"Error al guardar el historial de chats: {e}")
+
+    def delete_current_chat(self):
+        # Borra el chat actual con confirmación
+        if not self.current_chat_id:
+            return
+        confirm = messagebox.askyesno(
+            "Confirmar borrado",
+            f"¿Estás seguro que deseas borrar el chat '{self.current_chat_id}'? Esta acción no se puede deshacer."
+        )
+        if confirm:
+            del self.chats_data[self.current_chat_id]
+            chat_names = list(self.chats_data.keys())
+            if chat_names:
+                self.chat_selector.configure(values=chat_names)
+                self.chat_selector.set(chat_names[0])
+                self.current_chat_id = chat_names[0]
+                self.on_chat_selected(chat_names[0])
+            else:
+                self.create_new_chat()
+            self.save_chat_history()
 
 
 if __name__ == "__main__":
