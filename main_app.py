@@ -66,8 +66,12 @@ class ChatApp(ctk.CTk):
         ctk.set_appearance_mode("dark")
 
         self.current_user = None
+        self.current_emotion = None
         self.chat_history = []
         self.ollama = OllamaClient()
+        self.chats_data = {}  # Diccionario para todos los chats
+        self.current_chat_id = None
+        self.chat_selector = None
 
         # Load the vision model
         try:
@@ -84,8 +88,9 @@ class ChatApp(ctk.CTk):
         self.loading_thread = None
         self.loading_active = False
 
-        self.load_chat_history()
         self._setup_ui()
+        # Mueve la carga del historial aquí, después de crear los widgets
+        self.load_chat_history()
 
     def _setup_ui(self):
         # --- Main Frame ---
@@ -101,7 +106,7 @@ class ChatApp(ctk.CTk):
         self.top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         self.top_frame.columnconfigure(0, weight=1)
 
-        self.load_button = ctk.CTkButton(self.top_frame, text="1. Carga una imagen para identificar al usuario", command=self.identify_user_from_image)
+        self.load_button = ctk.CTkButton(self.top_frame, text="Carga una imagen para identificar al usuario", command=self.identify_user_from_image)
         self.load_button.grid(row=0, column=0, pady=10, sticky="ew")
 
         self.image_label = ctk.CTkLabel(self.top_frame, text="")
@@ -136,6 +141,15 @@ class ChatApp(ctk.CTk):
         self.loading_label = ctk.CTkLabel(self.chat_frame, text="", font=("Helvetica", 14, "italic"))
         self.loading_label.grid(row=2, column=0, pady=5, sticky="ew")
         
+        # --- Selector de chats ---
+        self.chat_selector_frame = ctk.CTkFrame(self.main_frame)
+        self.chat_selector_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0,10))
+        self.chat_selector_frame.columnconfigure(0, weight=1)
+        self.chat_selector = ctk.CTkComboBox(self.chat_selector_frame, values=[], command=self.on_chat_selected)
+        self.chat_selector.grid(row=0, column=0, sticky="ew", padx=(0,10))
+        self.new_chat_button = ctk.CTkButton(self.chat_selector_frame, text="Nuevo chat", command=self.create_new_chat)
+        self.new_chat_button.grid(row=0, column=1, sticky="ew")
+
         # Initially, disable chat
         self.disable_chat()
 
@@ -256,8 +270,53 @@ class ChatApp(ctk.CTk):
         except Exception as e:
             self.update_ui_for_user("DESCONOCIDO", f"Error al procesar la imagen: {e}")
     
+    def create_new_chat(self):
+        # Crear un nuevo chat con nombre único
+        chat_name = f"Chat {len(self.chats_data)+1}"
+        self.chats_data[chat_name] = {
+            "user": None,
+            "emotion": None,  # Guardar emoción
+            "history": []
+        }
+        self.chat_selector.configure(values=list(self.chats_data.keys()))
+        self.chat_selector.set(chat_name)
+        self.current_chat_id = chat_name
+        self.chat_history = []
+        self.chat_display.configure(state="normal")
+        self.chat_display.delete("1.0", "end")
+        self.chat_display.configure(state="disabled")
+        self.info_label.configure(text="Porfavor carga una imagen para iniciar el chat.")
+
+    def on_chat_selected(self, chat_name):
+        # Cambia al chat seleccionado
+        self.current_chat_id = chat_name
+        chat_data = self.chats_data.get(chat_name, {"user": None, "emotion": None, "history": []})
+        self.current_user = chat_data.get("user")
+        self.current_emotion = chat_data.get("emotion")
+        self.chat_history = chat_data.get("history", [])
+        
+        self.chat_display.configure(state="normal")
+        self.chat_display.delete("1.0", "end")
+        for msg in self.chat_history:
+            if msg.get("role") != "system":
+                sender = "Visionary" if msg["role"] == "assistant" else "Tú"
+                self.chat_display.insert("end", f"{sender}: {msg['content']}\n\n")
+        self.chat_display.configure(state="disabled")
+        
+        # Mostrar emoción en la interfaz si existe
+        if self.current_user:
+            info = f"Persona: {self.current_user}"
+            if self.current_emotion:
+                info += f" | Emoción: {self.current_emotion}"
+            self.info_label.configure(text=info)
+            self.enable_chat()
+        else:
+            self.info_label.configure(text="Porfavor carga una imagen para iniciar el chat.")
+            self.disable_chat()
+
     def update_ui_for_user(self, person, emotion):
         self.current_user = person
+        self.current_emotion = emotion
         prompt_config = build_dynamic_prompt(person, emotion)
         
         info_text = f"Persona: {person} | Emoción: {emotion}"
@@ -273,11 +332,19 @@ class ChatApp(ctk.CTk):
         # Mostrar el mensaje de bienvenida
         self.add_message("Visionary", prompt_config["welcome_message"])
         
+        # Actualiza el chat actual en el diccionario
+        if self.current_chat_id:
+            self.chats_data[self.current_chat_id] = {
+                "user": person,
+                "emotion": emotion,  # Guardar emoción
+                "history": self.chat_history.copy()
+            }
+        
         if person != "DESCONOCIDO":
             self.enable_chat()
         else:
             self.disable_chat()
-            
+
     def send_message_event(self, event):
         self.send_message()
 
@@ -286,12 +353,13 @@ class ChatApp(ctk.CTk):
         if not user_message:
             return
 
-        self.add_message("You", user_message)
+        self.add_message("Tú", user_message)
         self.chat_entry.delete(0, "end")
 
         # Add user message to history for context
         self.chat_history.append({"role": "user", "content": user_message})
-        
+        if self.current_chat_id:
+            self.chats_data[self.current_chat_id]["history"] = self.chat_history.copy()
         # Get AI response in a separate thread
         thread = threading.Thread(target=self.get_ai_response)
         thread.start()
@@ -329,6 +397,9 @@ class ChatApp(ctk.CTk):
         self.chat_display.insert("end", f"{sender}: {message}\n\n")
         self.chat_display.configure(state="disabled")
         self.chat_display.yview_moveto(1.0) # Auto-scroll
+        # Actualiza el historial en el chat actual
+        if self.current_chat_id:
+            self.chats_data[self.current_chat_id]["history"] = self.chat_history.copy()
 
     def enable_chat(self):
         self.chat_entry.configure(state="normal")
@@ -341,23 +412,38 @@ class ChatApp(ctk.CTk):
     def load_chat_history(self):
         try:
             if os.path.exists(CHAT_DB_FILE):
-                with open(CHAT_DB_FILE, 'r') as f:
-                    # In a real app, you would load history per user
-                    print("Loaded chat history (for reference, not implemented per user).")
+                with open(CHAT_DB_FILE, 'r', encoding="utf-8") as f:
+                    self.chats_data = json.load(f)
+                chat_names = list(self.chats_data.keys())
+                # Si hay chats precargados, crea y selecciona uno nuevo al inicio
+                new_chat_name = f"Chat {len(chat_names)+1}"
+                self.chats_data[new_chat_name] = {
+                    "user": None,
+                    "history": []
+                }
+                all_chats = list(self.chats_data.keys())
+                self.chat_selector.configure(values=all_chats)
+                self.chat_selector.set(new_chat_name)
+                self.current_chat_id = new_chat_name
+                self.on_chat_selected(new_chat_name)
+            else:
+                self.create_new_chat()
         except Exception as e:
-            print(f"Could not load chat history: {e}")
+            print(f"No se pudo cargar el historial de chats: {e}")
+            self.chats_data = {}
+            self.create_new_chat()
 
     def save_chat_history(self):
         try:
-            # Saves the last conversation for the current user
-            data_to_save = {
-                "user": self.current_user,
-                "history": self.chat_history
-            }
-            with open(CHAT_DB_FILE, 'w') as f:
-                json.dump(data_to_save, f, indent=4)
+            # Actualiza el historial del chat actual antes de guardar
+            if self.current_chat_id:
+                self.chats_data[self.current_chat_id]["user"] = self.current_user
+                self.chats_data[self.current_chat_id]["emotion"] = getattr(self, "current_emotion", None)
+                self.chats_data[self.current_chat_id]["history"] = self.chat_history.copy()
+            with open(CHAT_DB_FILE, 'w', encoding="utf-8") as f:
+                json.dump(self.chats_data, f, indent=4, ensure_ascii=False)
         except Exception as e:
-            print(f"Error saving chat history: {e}")
+            print(f"Error al guardar el historial de chats: {e}")
 
 
 if __name__ == "__main__":
