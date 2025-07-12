@@ -22,16 +22,16 @@ PERSON_CLASSES = ['Magleo', 'Hector']
 # --- Prompts for each user ---
 PROMPTS = {
     "Magleo": {
-        "system_message": "You are a friendly and slightly formal assistant. Your name is 'Visionary'. You are talking to Magleo. Be helpful and always maintain a positive tone.",
-        "welcome_message": "Hello Magleo, I see you in the photo. How have you been?"
+        "system_message": "Eres un asistente amigable y ligeramente formal. Tu nombre es 'Visionary'. Estás hablando con Magleo. Sé útil y mantén siempre un tono positivo.",
+        "welcome_message": "Hola Magleo, te veo en la foto. ¿Cómo has estado?"
     },
     "Hector": {
-        "system_message": "You are a very casual and funny assistant, almost like a friend. Your name is 'Visionary'. You are talking to Hector. Use slang and emojis often.",
-        "welcome_message": "Hey Hector! I see you there! What's up? 😄"
+        "system_message": "Eres un asistente muy casual y divertido, casi como un amigo. Tu nombre es 'Visionary'. Estás hablando con Hector. Usa jerga y emojis frecuentemente.",
+        "welcome_message": "¡Hey Hector! ¡Te veo ahí! ¿Qué tal? 😄"
     },
     "DESCONOCIDO": {
-        "system_message": "You are a polite but cautious security assistant. Your name is 'Visionary'. You are talking to an unknown person. You must inform them that you can only chat with registered users.",
-        "welcome_message": "Hello. I don't recognize you. My functionalities are reserved for registered users."
+        "system_message": "Eres un asistente de seguridad educado pero cauteloso. Tu nombre es 'Visionary'. Estás hablando con una persona desconocida. Debes informar que solo puedes conversar con usuarios registrados.",
+        "welcome_message": "Hola. No te reconozco. Mis funcionalidades están reservadas para usuarios registrados."
     }
 }
 
@@ -39,7 +39,7 @@ class ChatApp(ctk.CTk):
     def __init__(self):
         super().__init__()
 
-        self.title("Chat Agent with Vision - UNEG")
+        self.title("Agente de vision - UNEG")
         self.geometry("800x700")
         self.resizable(False, False)
         ctk.set_appearance_mode("dark")
@@ -51,11 +51,11 @@ class ChatApp(ctk.CTk):
         # Load the vision model
         try:
             self.vision_model = tf.keras.models.load_model(MODEL_PATH)
-            print("✅ Vision model loaded successfully.")
+            print("✅Modelo keras cargado exitosamente.")
         except Exception as e:
-            print(f"❌ Error loading vision model: {e}")
+            print(f"❌ Erros al cargar el modelo Keras {e}")
             self.vision_model = None
-            messagebox.showerror("Error", "Could not load the vision model. Please check the file 'model_emotions.keras'.")
+            messagebox.showerror("Error", "No se ha podido cargar el modelo de vision .Por favor revisa el archivo 'model_emotions.keras'.")
             self.destroy()
             return
         
@@ -76,13 +76,13 @@ class ChatApp(ctk.CTk):
         self.top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
         self.top_frame.columnconfigure(0, weight=1)
 
-        self.load_button = ctk.CTkButton(self.top_frame, text="1. Load Image to Identify User", command=self.identify_user_from_image)
+        self.load_button = ctk.CTkButton(self.top_frame, text="1. Carga una imagen para identificar al usuario", command=self.identify_user_from_image)
         self.load_button.grid(row=0, column=0, pady=10, sticky="ew")
 
         self.image_label = ctk.CTkLabel(self.top_frame, text="")
         self.image_label.grid(row=1, column=0, pady=5, sticky="ew")
         
-        self.info_label = ctk.CTkLabel(self.top_frame, text="Please load an image to start the chat.", font=("Helvetica", 16, "bold"))
+        self.info_label = ctk.CTkLabel(self.top_frame, text="Porfavor carga una imagen para iniciar el chat.", font=("Helvetica", 16, "bold"))
         self.info_label.grid(row=2, column=0, pady=10, sticky="ew")
 
         # --- Chat Frame ---
@@ -100,7 +100,7 @@ class ChatApp(ctk.CTk):
         self.entry_frame.columnconfigure(0, weight=1)
         self.entry_frame.columnconfigure(1, weight=0)
         
-        self.chat_entry = ctk.CTkEntry(self.entry_frame, placeholder_text="Type your message...", height=40)
+        self.chat_entry = ctk.CTkEntry(self.entry_frame, placeholder_text="Escribe tu mensaje...", height=40)
         self.chat_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.chat_entry.bind("<Return>", self.send_message_event)
 
@@ -112,14 +112,14 @@ class ChatApp(ctk.CTk):
 
     def identify_user_from_image(self):
         if not self.vision_model:
-            messagebox.showerror("Error", "Vision model is not loaded.")
+            messagebox.showerror("Error", "Modelo no cargado", "No se ha podido cargar el modelo de visión. Por favor revisa el archivo 'model_emotions.keras'.")
             return
 
         file_path = filedialog.askopenfilename(filetypes=[("Image files", "*.jpg *.jpeg *.png")])
         if not file_path:
             return
 
-        # Display the image
+        # Mostrar la imagen
         pil_image = Image.open(file_path)
         # --- Corregir orientación usando EXIF ---
         try:
@@ -135,17 +135,17 @@ class ChatApp(ctk.CTk):
                     elif orientation == 8:
                         pil_image = pil_image.rotate(90, expand=True)
         except Exception as e:
-            print(f"Warning correcting orientation: {e}")
+            print(f"Error al corregir la orientación: {e}")
         display_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(150, 150))
         self.image_label.configure(image=display_image)
 
-        # Process and predict in a separate thread to avoid freezing the GUI
+        # Procesar y predecir en un hilo separado para evitar congelar la interfaz
         thread = threading.Thread(target=self.predict, args=(file_path,))
         thread.start()
 
     def predict(self, file_path):
         try:
-            # Preprocess the image
+            # Preprocesar la imagen
             pil_image = Image.open(file_path)
             # --- Corregir orientación usando EXIF ---
             try:
@@ -161,7 +161,7 @@ class ChatApp(ctk.CTk):
                         elif orientation == 8:
                             pil_image = pil_image.rotate(90, expand=True)
             except Exception as e:
-                print(f"Warning correcting orientation: {e}")
+                print(f"Error al corregir la orientación: {e}")
             # --- Carga compatible con nombres UTF-8 ---
             img_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
@@ -169,7 +169,7 @@ class ChatApp(ctk.CTk):
             faces = face_cascade.detectMultiScale(gray, scaleFactor=1.1, minNeighbors=5)
 
             if len(faces) == 0:
-                self.update_ui_for_user("DESCONOCIDO", "No face detected in the image.")
+                self.update_ui_for_user("DESCONOCIDO", "No se detectó ningún rostro en la imagen.")
                 return
 
             x, y, w, h = faces[0]
@@ -178,11 +178,11 @@ class ChatApp(ctk.CTk):
             img_normalized = img_resized / 255.0
             img_batch = np.expand_dims(img_normalized, axis=0)
 
-            # Make prediction
+            # Realizar la predicción
             predictions = self.vision_model.predict(img_batch)
             emotion_preds, person_preds = predictions[0][0], predictions[1][0]
             
-            # Interpret results
+            # Interpretar resultados
             emotion_index = np.argmax(emotion_preds)
             predicted_emotion = EMOTION_CLASSES[emotion_index]
 
@@ -197,13 +197,13 @@ class ChatApp(ctk.CTk):
             self.update_ui_for_user(predicted_person, predicted_emotion)
 
         except Exception as e:
-            self.update_ui_for_user("DESCONOCIDO", f"Error processing image: {e}")
+            self.update_ui_for_user("DESCONOCIDO", f"Error al procesar la imagen: {e}")
     
     def update_ui_for_user(self, person, emotion):
         self.current_user = person
         prompt_config = PROMPTS.get(person, PROMPTS["DESCONOCIDO"])
         
-        info_text = f"User: {person} | Emotion: {emotion}"
+        info_text = f"Persona: {person} | Emoción: {emotion}"
         self.info_label.configure(text=info_text)
 
         # Clear previous chat and set up the new one
