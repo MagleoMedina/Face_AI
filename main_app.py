@@ -65,37 +65,47 @@ class ChatApp(ctk.CTk):
     def _setup_ui(self):
         # --- Main Frame ---
         self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        self.main_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.rowconfigure(0, weight=1)
+        self.columnconfigure(0, weight=1)
+        self.main_frame.rowconfigure(1, weight=1)
+        self.main_frame.columnconfigure(0, weight=1)
 
         # --- Top Frame for User Identification ---
         self.top_frame = ctk.CTkFrame(self.main_frame)
-        self.top_frame.pack(pady=10, padx=10, fill="x")
+        self.top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        self.top_frame.columnconfigure(0, weight=1)
 
         self.load_button = ctk.CTkButton(self.top_frame, text="1. Load Image to Identify User", command=self.identify_user_from_image)
-        self.load_button.pack(pady=10)
+        self.load_button.grid(row=0, column=0, pady=10, sticky="ew")
 
         self.image_label = ctk.CTkLabel(self.top_frame, text="")
-        self.image_label.pack(pady=5)
+        self.image_label.grid(row=1, column=0, pady=5, sticky="ew")
         
         self.info_label = ctk.CTkLabel(self.top_frame, text="Please load an image to start the chat.", font=("Helvetica", 16, "bold"))
-        self.info_label.pack(pady=10)
+        self.info_label.grid(row=2, column=0, pady=10, sticky="ew")
 
         # --- Chat Frame ---
         self.chat_frame = ctk.CTkFrame(self.main_frame, fg_color="transparent")
-        self.chat_frame.pack(pady=10, padx=10, fill="both", expand=True)
+        self.chat_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.chat_frame.rowconfigure(0, weight=1)
+        self.chat_frame.columnconfigure(0, weight=1)
+        self.chat_frame.rowconfigure(1, weight=0)
 
         self.chat_display = ctk.CTkTextbox(self.chat_frame, state="disabled", wrap="word", height=400)
-        self.chat_display.pack(pady=10, padx=10, fill="both", expand=True)
+        self.chat_display.grid(row=0, column=0, pady=10, padx=10, sticky="nsew")
         
         self.entry_frame = ctk.CTkFrame(self.chat_frame, fg_color="transparent")
-        self.entry_frame.pack(pady=10, padx=10, fill="x")
+        self.entry_frame.grid(row=1, column=0, pady=10, padx=10, sticky="ew")
+        self.entry_frame.columnconfigure(0, weight=1)
+        self.entry_frame.columnconfigure(1, weight=0)
         
         self.chat_entry = ctk.CTkEntry(self.entry_frame, placeholder_text="Type your message...", height=40)
-        self.chat_entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
+        self.chat_entry.grid(row=0, column=0, sticky="ew", padx=(0, 10))
         self.chat_entry.bind("<Return>", self.send_message_event)
 
         self.send_button = ctk.CTkButton(self.entry_frame, text="Send", command=self.send_message)
-        self.send_button.pack(side="right")
+        self.send_button.grid(row=0, column=1, sticky="ew")
         
         # Initially, disable chat
         self.disable_chat()
@@ -111,6 +121,21 @@ class ChatApp(ctk.CTk):
 
         # Display the image
         pil_image = Image.open(file_path)
+        # --- Corregir orientación usando EXIF ---
+        try:
+            exif = pil_image._getexif()
+            if exif is not None:
+                orientation_key = 274  # cf. ExifTags
+                if orientation_key in exif:
+                    orientation = exif[orientation_key]
+                    if orientation == 3:
+                        pil_image = pil_image.rotate(180, expand=True)
+                    elif orientation == 6:
+                        pil_image = pil_image.rotate(270, expand=True)
+                    elif orientation == 8:
+                        pil_image = pil_image.rotate(90, expand=True)
+        except Exception as e:
+            print(f"Warning correcting orientation: {e}")
         display_image = ctk.CTkImage(light_image=pil_image, dark_image=pil_image, size=(150, 150))
         self.image_label.configure(image=display_image)
 
@@ -122,6 +147,22 @@ class ChatApp(ctk.CTk):
         try:
             # Preprocess the image
             pil_image = Image.open(file_path)
+            # --- Corregir orientación usando EXIF ---
+            try:
+                exif = pil_image._getexif()
+                if exif is not None:
+                    orientation_key = 274  # cf. ExifTags
+                    if orientation_key in exif:
+                        orientation = exif[orientation_key]
+                        if orientation == 3:
+                            pil_image = pil_image.rotate(180, expand=True)
+                        elif orientation == 6:
+                            pil_image = pil_image.rotate(270, expand=True)
+                        elif orientation == 8:
+                            pil_image = pil_image.rotate(90, expand=True)
+            except Exception as e:
+                print(f"Warning correcting orientation: {e}")
+            # --- Carga compatible con nombres UTF-8 ---
             img_array = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
             gray = cv2.cvtColor(img_array, cv2.COLOR_BGR2GRAY)
             face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
