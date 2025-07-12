@@ -8,6 +8,8 @@ import threading
 import json
 from ollama_client import OllamaClient
 import os
+import itertools
+import time
 
 # --- Constants and Configurations ---
 MODEL_PATH = 'model_emotions.keras'
@@ -19,21 +21,40 @@ CHAT_DB_FILE = 'chat_history.json'
 EMOTION_CLASSES = ['alegre','cansado','ira','pensativo','riendo','sorprendido','triste']
 PERSON_CLASSES = ['Magleo', 'Hector']
 
-# --- Prompts for each user ---
-PROMPTS = {
-    "Magleo": {
-        "system_message": "Eres un asistente amigable y ligeramente formal. Tu nombre es 'Visionary'. Estás hablando con Magleo. Sé útil y mantén siempre un tono positivo.",
-        "welcome_message": "Hola Magleo, te veo en la foto. ¿Cómo has estado?"
-    },
-    "Hector": {
-        "system_message": "Eres un asistente muy casual y divertido, casi como un amigo. Tu nombre es 'Visionary'. Estás hablando con Hector. Usa jerga y emojis frecuentemente.",
-        "welcome_message": "¡Hey Hector! ¡Te veo ahí! ¿Qué tal? 😄"
-    },
-    "DESCONOCIDO": {
-        "system_message": "Eres un asistente de seguridad educado pero cauteloso. Tu nombre es 'Visionary'. Estás hablando con una persona desconocida. Debes informar que solo puedes conversar con usuarios registrados.",
-        "welcome_message": "Hola. No te reconozco. Mis funcionalidades están reservadas para usuarios registrados."
-    }
-}
+def build_dynamic_prompt(person, emotion):
+    if person == "DESCONOCIDO":
+        system_message = (
+            f"Eres un asistente de seguridad educado pero cauteloso. "
+            f"Tu nombre es 'Visionary'. Estás hablando con una persona desconocida que parece {emotion}. "
+            f"Debes informar que solo puedes conversar con usuarios registrados."
+        )
+        welcome_message = (
+            f"Hola. No te reconozco y pareces {emotion}. Mis funcionalidades están reservadas para usuarios registrados."
+        )
+    elif person == "Magleo":
+        system_message = (
+            f"Eres un asistente amigable y ligeramente formal. Tu nombre es 'Visionary'. "
+            f"Estás hablando con Magleo, quien parece {emotion}. Adapta tu respuesta a su estado emocional."
+        )
+        welcome_message = (
+            f"Hola Magleo, te veo {emotion} en la foto. ¿Quieres conversar sobre cómo te sientes?"
+        )
+    elif person == "Hector":
+        system_message = (
+            f"Eres un asistente muy casual y divertido, casi como un amigo. Tu nombre es 'Visionary'. "
+            f"Estás hablando con Hector, quien parece {emotion}. Usa jerga, emojis y adapta tu respuesta a su emoción."
+        )
+        welcome_message = (
+            f"¡Hey Hector! Te veo {emotion} en la foto. ¿Qué onda? ¿Quieres platicar?"
+        )
+    else:
+        system_message = (
+            f"Eres un asistente. Tu nombre es 'Visionary'. Estás hablando con {person}, quien parece {emotion}."
+        )
+        welcome_message = (
+            f"Hola {person}, te veo {emotion} en la foto."
+        )
+    return {"system_message": system_message, "welcome_message": welcome_message}
 
 class ChatApp(ctk.CTk):
     def __init__(self):
@@ -59,6 +80,10 @@ class ChatApp(ctk.CTk):
             self.destroy()
             return
         
+        self.loading_label = None
+        self.loading_thread = None
+        self.loading_active = False
+
         self.load_chat_history()
         self._setup_ui()
 
@@ -107,8 +132,40 @@ class ChatApp(ctk.CTk):
         self.send_button = ctk.CTkButton(self.entry_frame, text="Send", command=self.send_message)
         self.send_button.grid(row=0, column=1, sticky="ew")
         
+        # --- Loading Indicator ---
+        self.loading_label = ctk.CTkLabel(self.chat_frame, text="", font=("Helvetica", 14, "italic"))
+        self.loading_label.grid(row=2, column=0, pady=5, sticky="ew")
+        
         # Initially, disable chat
         self.disable_chat()
+
+    def start_loading_animation(self):
+        """
+        Inicia la animación de carga mostrando un mensaje dinámico.
+        """
+        self.loading_active = True
+        self.loading_label.configure(text="Visionary está pensando en su respuesta...")
+        self.loading_thread = threading.Thread(target=self._loading_animation)
+        self.loading_thread.start()
+
+    def stop_loading_animation(self):
+        """
+        Detiene la animación de carga.
+        """
+        self.loading_active = False
+        if self.loading_thread:
+            self.loading_thread.join()
+        self.loading_label.configure(text="")
+
+    def _loading_animation(self):
+        """
+        Actualiza dinámicamente el texto del indicador de carga.
+        """
+        dots = itertools.cycle(["", ".", "..", "..."])
+        while self.loading_active:
+            current_dots = next(dots)
+            self.loading_label.configure(text=f"Visionary está pensando en su respuesta{current_dots}")
+            time.sleep(0.5)
 
     def identify_user_from_image(self):
         if not self.vision_model:
@@ -201,19 +258,19 @@ class ChatApp(ctk.CTk):
     
     def update_ui_for_user(self, person, emotion):
         self.current_user = person
-        prompt_config = PROMPTS.get(person, PROMPTS["DESCONOCIDO"])
+        prompt_config = build_dynamic_prompt(person, emotion)
         
         info_text = f"Persona: {person} | Emoción: {emotion}"
         self.info_label.configure(text=info_text)
 
-        # Clear previous chat and set up the new one
+        # Limpiar chat anterior y configurar el nuevo
         self.chat_display.configure(state="normal")
         self.chat_display.delete("1.0", "end")
         
-        # Initialize chat history with the system message
+        # Inicializar historial con el mensaje del sistema
         self.chat_history = [{"role": "system", "content": prompt_config["system_message"]}]
         
-        # Display the welcome message
+        # Mostrar el mensaje de bienvenida
         self.add_message("Visionary", prompt_config["welcome_message"])
         
         if person != "DESCONOCIDO":
@@ -240,25 +297,32 @@ class ChatApp(ctk.CTk):
         thread.start()
 
     def get_ai_response(self):
-        # Disable input while AI is thinking
+        # Inicia el indicador de carga
+        self.start_loading_animation()
+
+        # Deshabilita la entrada mientras el modelo responde
         self.chat_entry.configure(state="disabled")
         self.send_button.configure(state="disabled")
         
-        response = self.ollama.chat(model='gemma3', messages=self.chat_history)
-        
-        if response and "message" in response:
-            ai_message = response['message']['content']
+        try:
+            response = self.ollama.chat(model='gemma3', messages=self.chat_history)
             
-            # Add AI message to history
-            self.chat_history.append({"role": "assistant", "content": ai_message})
-            self.add_message("Visionary", ai_message)
-        else:
-            self.add_message("System", "Error: Could not get a response from Ollama. Make sure it is running.")
-        
-        # Re-enable input
-        self.chat_entry.configure(state="normal")
-        self.send_button.configure(state="normal")
-        self.save_chat_history()
+            if response and "message" in response:
+                ai_message = response['message']['content']
+                
+                # Agrega el mensaje del asistente al historial
+                self.chat_history.append({"role": "assistant", "content": ai_message})
+                self.add_message("Visionary", ai_message)
+            else:
+                self.add_message("System", "Error: No se pudo obtener una respuesta de Ollama. Asegúrate de que esté funcionando.")
+        finally:
+            # Detiene el indicador de carga
+            self.stop_loading_animation()
+
+            # Habilita la entrada nuevamente
+            self.chat_entry.configure(state="normal")
+            self.send_button.configure(state="normal")
+            self.save_chat_history()
 
     def add_message(self, sender, message):
         self.chat_display.configure(state="normal")
