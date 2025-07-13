@@ -147,9 +147,10 @@ class ChatApp(ctk.CTk):
         self.chat_selector_frame.columnconfigure(0, weight=1)
         self.chat_selector = ctk.CTkComboBox(self.chat_selector_frame, values=[], command=self.on_chat_selected)
         self.chat_selector.grid(row=0, column=0, sticky="ew", padx=(0,10))
+        self.chat_selector.bind("<Return>", self.rename_current_chat_event)  # Permite renombrar con Enter
+
         self.new_chat_button = ctk.CTkButton(self.chat_selector_frame, text="Nuevo chat", command=self.create_new_chat)
         self.new_chat_button.grid(row=0, column=1, sticky="ew")
-        # Botón para borrar el chat actual (color rojo)
         self.delete_chat_button = ctk.CTkButton(
             self.chat_selector_frame,
             text="Borrar chat",
@@ -294,6 +295,22 @@ class ChatApp(ctk.CTk):
         self.chat_display.delete("1.0", "end")
         self.chat_display.configure(state="disabled")
         self.info_label.configure(text="Porfavor carga una imagen para iniciar el chat.")
+
+    def rename_current_chat_event(self, event):
+        self.rename_current_chat()
+
+    def rename_current_chat(self):
+        # Obtiene el nuevo nombre desde el ComboBox
+        new_name = self.chat_selector.get().strip()
+        if not new_name or new_name == self.current_chat_id or new_name in self.chats_data:
+            return  # No renombrar si el nombre es vacío, igual al actual o ya existe
+
+        # Renombra el chat en el diccionario
+        self.chats_data[new_name] = self.chats_data.pop(self.current_chat_id)
+        self.current_chat_id = new_name
+        self.chat_selector.configure(values=list(self.chats_data.keys()))
+        self.chat_selector.set(new_name)
+        self.save_chat_history()
 
     def on_chat_selected(self, chat_name):
         # Cambia al chat seleccionado
