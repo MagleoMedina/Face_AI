@@ -1,6 +1,6 @@
-# Face_AI
+# Visionary_AI
 
-**Face_AI** es una aplicación de escritorio que combina visión por computadora y chat inteligente para identificar personas y emociones a partir de imágenes, permitiendo conversaciones personalizadas según el usuario y su estado emocional.
+**Visionary_AI** es una aplicación de escritorio que combina visión por computadora y chat inteligente para identificar personas y emociones a partir de imágenes, permitiendo conversaciones personalizadas según el usuario y su estado emocional.
 
 ## Características
 
@@ -43,6 +43,9 @@ Asegúrate de que Ollama esté corriendo y que el modelo esté disponible antes 
 ## Uso
 
 1. Ejecuta Ollama localmente.
+```bash
+ollama serve
+```
 2. Inicia la aplicación:
 
 ```bash
