@@ -26,8 +26,7 @@ def build_dynamic_prompt(person, emotion):
         system_message = (
             f"Eres un asistente de seguridad educado pero cauteloso. "
             f"Tu nombre es 'Visionary'. Estás hablando con una persona desconocida que parece {emotion}. "
-            f"Debes informar que solo puedes conversar con usuarios registrados."
-        )
+            f"Responde de manera neutral y profesional, evitando compartir información sensible.")
         welcome_message = (
             f"Hola. No te reconozco y pareces {emotion}. Mis funcionalidades están reservadas para usuarios registrados."
         )
@@ -93,11 +92,47 @@ class ChatApp(ctk.CTk):
         self.load_chat_history()
 
     def _setup_ui(self):
-        # --- Main Frame ---
+        # --- Sidebar para chats ---
+        self.sidebar_frame = ctk.CTkFrame(self)
+        self.sidebar_frame.grid(row=0, column=0, sticky="nsw", padx=(0,0), pady=0)
+        self.sidebar_frame.rowconfigure(0, weight=0)
+        self.sidebar_frame.rowconfigure(1, weight=1)
+        self.sidebar_frame.columnconfigure(0, weight=1)
+
+        # Título para la sección de chats (no botón)
+        self.chats_title = ctk.CTkLabel(
+            self.sidebar_frame,
+            text="Chats",
+            font=("Helvetica", 18, "bold"),
+            anchor="center"
+        )
+        self.chats_title.grid(row=0, column=0, sticky="ew", padx=10, pady=(10,0))
+
+        # Frame del menú de chats (siempre visible)
+        self.chat_menu_frame = ctk.CTkFrame(self.sidebar_frame)
+        self.chat_menu_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=10)
+        self.chat_menu_frame.columnconfigure(0, weight=1)
+
+        self.chat_selector = ctk.CTkComboBox(self.chat_menu_frame, values=[], command=self.on_chat_selected)
+        self.chat_selector.grid(row=0, column=0, sticky="ew", padx=(0,10), pady=(0,10))
+        self.chat_selector.bind("<Return>", self.rename_current_chat_event)
+
+        self.new_chat_button = ctk.CTkButton(self.chat_menu_frame, text="Nuevo chat", command=self.create_new_chat)
+        self.new_chat_button.grid(row=1, column=0, sticky="ew", pady=(0,10))
+        self.delete_chat_button = ctk.CTkButton(
+            self.chat_menu_frame,
+            text="Borrar chat",
+            fg_color="red",
+            hover_color="#b30000",
+            command=self.delete_current_chat
+        )
+        self.delete_chat_button.grid(row=2, column=0, sticky="ew")
+
+        # --- Main Frame (contenido principal) ---
         self.main_frame = ctk.CTkFrame(self)
-        self.main_frame.grid(row=0, column=0, sticky="nsew", padx=10, pady=10)
+        self.main_frame.grid(row=0, column=1, sticky="nsew", padx=10, pady=10)
         self.rowconfigure(0, weight=1)
-        self.columnconfigure(0, weight=1)
+        self.columnconfigure(1, weight=1)
         self.main_frame.rowconfigure(1, weight=1)
         self.main_frame.columnconfigure(0, weight=1)
 
@@ -141,24 +176,6 @@ class ChatApp(ctk.CTk):
         self.loading_label = ctk.CTkLabel(self.chat_frame, text="", font=("Helvetica", 14, "italic"))
         self.loading_label.grid(row=2, column=0, pady=5, sticky="ew")
         
-        # --- Selector de chats ---
-        self.chat_selector_frame = ctk.CTkFrame(self.main_frame)
-        self.chat_selector_frame.grid(row=3, column=0, sticky="ew", padx=10, pady=(0,10))
-        self.chat_selector_frame.columnconfigure(0, weight=1)
-        self.chat_selector = ctk.CTkComboBox(self.chat_selector_frame, values=[], command=self.on_chat_selected)
-        self.chat_selector.grid(row=0, column=0, sticky="ew", padx=(0,10))
-        self.chat_selector.bind("<Return>", self.rename_current_chat_event)  # Permite renombrar con Enter
-
-        self.new_chat_button = ctk.CTkButton(self.chat_selector_frame, text="Nuevo chat", command=self.create_new_chat)
-        self.new_chat_button.grid(row=0, column=1, sticky="ew")
-        self.delete_chat_button = ctk.CTkButton(
-            self.chat_selector_frame,
-            text="Borrar chat",
-            fg_color="red",
-            hover_color="#b30000",
-            command=self.delete_current_chat
-        )
-        self.delete_chat_button.grid(row=0, column=2, sticky="ew", padx=(10,0))
         # --- Initially, disable chat
         self.disable_chat()
 
