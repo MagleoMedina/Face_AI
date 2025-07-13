@@ -1,73 +1,68 @@
 # Face_AI
 
-Proyecto de reconocimiento facial para la clasificación de emociones y personas usando redes neuronales convolucionales (CNN) en Keras/TensorFlow.
+**Face_AI** es una aplicación de escritorio que combina visión por computadora y chat inteligente para identificar personas y emociones a partir de imágenes, permitiendo conversaciones personalizadas según el usuario y su estado emocional.
 
-## Descripción
+## Características
 
-Este proyecto permite entrenar un modelo capaz de identificar la emoción y la persona en imágenes faciales. El modelo es multi-salida: predice tanto la emoción (7 clases) como la persona (2 clases). Incluye scripts para entrenamiento, pruebas individuales (GUI) y pruebas por lotes.
-
-## Estructura del Proyecto
-
-- `train_model.py`: Entrena el modelo CNN con imágenes organizadas por carpetas de emociones.
-- `test.py`: Interfaz gráfica (GUI) para probar el modelo con imágenes individuales.
-- `test_colab.py`: Script para probar el modelo con todas las imágenes de una carpeta.
-- `images/`: Carpeta con subcarpetas por emoción, cada una con imágenes nombradas por persona.
-- `graphics/`: Carpeta donde se guardan las gráficas y resultados del entrenamiento.
-- `model_emotions.keras`: Archivo del modelo entrenado (se genera tras el entrenamiento).
+- Identificación de personas y emociones usando modelos de TensorFlow/Keras.
+- Interfaz gráfica moderna con CustomTkinter.
+- Chat inteligente impulsado por Ollama (modelo local de lenguaje).
+- Historial de chats persistente y gestión de múltiples conversaciones.
+- Adaptación dinámica de respuestas según usuario y emoción detectada.
 
 ## Requisitos
 
 - Python 3.8+
-- TensorFlow y Keras
-- OpenCV
-- NumPy
-- Matplotlib
-- Seaborn
-- Pillow
-- scikit-learn
-- customtkinter (solo para la GUI)
+- Ollama instalado y ejecutándose localmente ([https://ollama.com/](https://ollama.com/))
+- Dependencias Python:
+  - customtkinter
+  - pillow
+  - opencv-python
+  - numpy
+  - tensorflow
+  - requests
 
-Instala los requisitos con:
-
-```bash
-pip install tensorflow keras opencv-python numpy matplotlib seaborn pillow scikit-learn customtkinter
-```
-
-## Entrenamiento
-
-1. Organiza tus imágenes en la carpeta `images/`, con subcarpetas para cada emoción (`alegre`, `cansado`, etc.).
-2. Nombra los archivos de imagen como `Magleo_*.jpg` o `Hector_*.jpg` según la persona.
-3. Ejecuta el script de entrenamiento:
+## Instalación
 
 ```bash
-python train_model.py
+pip install customtkinter pillow opencv-python numpy tensorflow requests
 ```
 
-Se generarán el modelo entrenado y gráficas en la carpeta `graphics/`.
+Asegúrate de tener el archivo del modelo `model_emotions.keras` en la raíz del proyecto.
 
-## Prueba con Interfaz Gráfica
+### Instalar el modelo Gemma3 en Ollama
 
-Ejecuta:
+Este proyecto utiliza el modelo **Gemma3** para el chat inteligente. Para instalarlo en Ollama, ejecuta:
 
 ```bash
-python test.py
+ollama pull gemma:3b
 ```
 
-Carga una imagen y el sistema detectará la emoción y la persona.
+Asegúrate de que Ollama esté corriendo y que el modelo esté disponible antes de iniciar la aplicación.
 
-## Prueba por Lote (google colab)
+## Uso
 
-Coloca imágenes en la carpeta `testing/` y ejecuta:
+1. Ejecuta Ollama localmente.
+2. Inicia la aplicación:
 
 ```bash
-python test_colab.py
+python main_app.py
 ```
 
-El script mostrará las predicciones para cada imagen.
+3. Carga una imagen para identificar al usuario y su emoción.
+4. Comienza a chatear con el asistente "Visionary".
 
-## Notas
+## Estructura del Proyecto
 
-- El modelo requiere que las imágenes tengan un rostro visible y estén correctamente nombradas.
-- El umbral de confianza para la identificación de persona puede ajustarse en `test.py`.
+- `main_app.py`: Interfaz gráfica y lógica principal.
+- `ollama_client.py`: Cliente para interactuar con Ollama.
+- `chat_history.json`: Historial persistente de chats.
+- `model_emotions.keras`: Modelo de Keras para reconocimiento de emociones y personas. Para obternerlo debe compilar la rama Face_AI
+
+## Créditos
+
+Desarrollado por Magleo y Hector.
+
+---
 
 
